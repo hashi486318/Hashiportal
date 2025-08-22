@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+  <title>何の変哲もない時計</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #fff;
+    }
+
+    #clock-container {
+      position: relative;
+      font-size: 9em;
+      line-height: 1;
+      text-align: center;
+      z-index: 10;
+    }
+
+    #clock {
+      color: #000;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      margin: 0;
+    }
+
+    #analog-bg {
+      position:absolute;
+      top:50%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      opacity:0.05;
+      z-index:1;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="analog-bg" width="1000" height="1000"></canvas>
+  <div id="clock-container">
+    <div id="clock"></div>
+    <div id="ampm" style="font-size:0.6em; color:#000; text-align:center; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); margin-top:-0.2em;"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('analog-bg');
+    const ctx = canvas.getContext('2d');
+    const radius = canvas.width / 2;
+
+    function drawAnalogClock() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+
+      ctx.save();
+      ctx.translate(radius,radius);
+
+      const outerLineWidth = radius * 0.02; // メイン縁
+      const decorationLineWidth = radius * 0.01; // 外装飾円
+
+      // メイン縁
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.90 - outerLineWidth/2, 0, 2 * Math.PI);
+      ctx.lineWidth = outerLineWidth;
+      ctx.strokeStyle = 'black';
+      ctx.stroke();
+
+      // 外装飾円
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.98 - decorationLineWidth/2, 0, 2 * Math.PI);
+      ctx.lineWidth = decorationLineWidth;
+      ctx.strokeStyle = 'gray';
+      ctx.stroke();
+
+      // 数字描画
+      ctx.font = radius * 0.14 + "px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (let num = 1; num <= 12; num++) {
+      let ang = num * Math.PI / 6;
+
+      // 短い目盛り線
+      let innerRadius = radius * 0.85; // 内側のスタート位置
+      let outerRadius = radius * 0.90; // 外側の終了位置
+      let x1 = Math.sin(ang) * innerRadius;
+      let y1 = -Math.cos(ang) * innerRadius;
+      let x2 = Math.sin(ang) * outerRadius;
+      let y2 = -Math.cos(ang) * outerRadius;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineWidth = 4; // 線の太さ
+      ctx.strokeStyle = 'black';
+      ctx.stroke();
+      
+      // 中心の黒い点
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.03, 0, 2 * Math.PI); // 半径はお好みで調整
+      ctx.fillStyle = 'black';
+      ctx.fill();
+
+      // 数字描画
+      let x = Math.sin(ang) * (radius * 0.75);
+      let y = -Math.cos(ang) * (radius * 0.75);
+      ctx.fillStyle = 'white';
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = radius * 0.01;
+      ctx.fillText(num.toString(), x, y);
+      ctx.strokeText(num.toString(), x, y);
+      }
+
+      const now = new Date();
+      let h = now.getHours()%12;
+      let m = now.getMinutes();
+      let s = now.getSeconds();
+
+      // 短針
+      ctx.save();
+      ctx.rotate((h*30 + m*0.5)*Math.PI/180);
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(-5, -radius*0.45);
+      ctx.lineTo(0, -radius*0.5);
+      ctx.lineTo(5, -radius*0.45);
+      ctx.closePath();
+      ctx.fillStyle = 'black';
+      ctx.fill();
+      ctx.restore();
+
+      // 長針
+      ctx.save();
+      ctx.rotate((m*6)*Math.PI/180);
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(-4, -radius*0.65);
+      ctx.lineTo(0, -radius*0.7);
+      ctx.lineTo(4, -radius*0.65);
+      ctx.closePath();
+      ctx.fillStyle = 'black';
+      ctx.fill();
+      ctx.restore();
+
+      // 秒針
+      ctx.save();
+      ctx.rotate((s*6)*Math.PI/180);
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(0,-radius*0.75);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle='red';
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.restore();
+      
+    }
+
+    setInterval(drawAnalogClock,1000);
+
+    // デジタル時計
+    const clock = document.getElementById("clock");
+    const ampmDiv = document.getElementById("ampm");
+
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours();
+      const minutes = now.getMinutes();
+      const seconds = now.getSeconds();
+  
+      const ampm = hours >= 12 ? "PM" : "AM";
+      ampmDiv.textContent = ampm;
+
+      hours = hours % 12;
+      if (hours === 0) hours = 12;
+
+      const timeStr = `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+      clock.textContent = timeStr;
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+  </script>
+</body>
+</html>
