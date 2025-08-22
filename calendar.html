@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="apple-touch-icon" sizes="512x512" href="favicon.png">
+  <link rel="manifest" href="manifest.json">
+  <title>何の変哲もないカレンダー</title>
+  <style>
+    body { 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      height: 100vh; 
+      margin: 0;
+      font-family: sans-serif;
+    }
+    .calendar {
+      text-align: center;
+      margin-top: 50px;
+    }
+    table {
+      width: 100%;
+      max-width: 1200px;
+      border-collapse: collapse;
+      margin: 15px auto;
+    }
+    th, td {
+      width: 120px;
+      height: 90px;
+      text-align: center; 
+      border: 1.5px solid #aaa;
+      font-size: 27px;
+      position: relative;
+      cursor: pointer;
+    }
+    th {
+      background: #eee;
+    }
+    h2 {
+      font-size: 48px;
+      margin: 20px 0;
+     }
+    .sunday { color: red; }
+    .saturday { color: blue; }
+    .holiday { color: red; font-weight: bold; }
+    .today { background: #ffeb3b; font-weight: bold; }
+
+    /* 吹き出し */
+    .tooltip {
+      display: none;
+      position: absolute;
+      bottom: 110%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: black;
+      color: white;
+      padding: 5px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+      font-size: 14px;
+      z-index: 10;
+    }
+    .tooltip::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 5px;
+      border-style: solid;
+      border-color: black transparent transparent transparent;
+    }
+  </style>
+</head>
+<body>
+  <div class="calendar">
+    <h2 id="month"></h2>
+    <table id="calendar"></table>
+  </div>
+
+<script>
+const today = new Date();
+const year = today.getFullYear();
+const month = today.getMonth();
+const todayDate = today.getDate();
+
+const monthNames = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
+];
+
+document.getElementById("month").textContent = `${monthNames[month]} ${year}`;
+
+const firstDay = new Date(year, month, 1).getDay();
+const lastDate = new Date(year, month + 1, 0).getDate();
+const prevLastDate = new Date(year, month, 0).getDate();
+const table = document.getElementById("calendar");
+
+// 曜日ヘッダー
+const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+let thead = "<tr>";
+for (let d of days) thead += `<th>${d}</th>`;
+thead += "</tr>";
+table.innerHTML = thead;
+
+// カレンダー本体
+let row = "<tr>";
+for (let i = 0; i < firstDay; i++) {
+  row += `<td style="color:#ccc">${prevLastDate - firstDay + i + 1}</td>`;
+}
+for (let date = 1; date <= lastDate; date++) {
+  let weekday = (firstDay + date - 1) % 7;
+  let cls = "";
+  if (weekday === 0) cls = "sunday";
+  if (weekday === 6) cls = "saturday";
+  if (date === todayDate) cls += (cls ? " today" : "today");
+  row += `<td class="${cls}" id="day-${date}">${date}</td>`;
+  if (weekday === 6) row += "</tr><tr>";
+}
+let weekday = (firstDay + lastDate - 1) % 7;
+for (let i = weekday + 1; i <= 6; i++) {
+  row += `<td style="color:#ccc">${i - weekday}</td>`;
+}
+row += "</tr>";
+table.innerHTML += row;
+
+// 祝日を取得して吹き出し表示
+fetch(`https://holidays-jp.github.io/api/v1/${year}/date.json`)
+  .then(res => res.json())
+  .then(data => {
+    for (let dateStr in data) {
+      let d = new Date(dateStr);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const dayCell = document.getElementById(`day-${d.getDate()}`);
+        if (dayCell) {
+          dayCell.classList.add("holiday");
+
+          const tooltip = document.createElement("div");
+          tooltip.className = "tooltip";
+          tooltip.textContent = data[dateStr];
+          dayCell.appendChild(tooltip);
+
+          // クリックで吹き出しトグル
+          dayCell.addEventListener("click", e => {
+            document.querySelectorAll(".tooltip").forEach(t => {
+              if (t !== tooltip) t.style.display = "none";
+            });
+            tooltip.style.display = (tooltip.style.display === "block") ? "none" : "block";
+            e.stopPropagation();
+          });
+        }
+      }
+    }
+
+    // 祝日以外のセルクリックで吹き出しを閉じる
+    document.querySelectorAll("#calendar td:not(.holiday)").forEach(cell => {
+      cell.addEventListener("click", () => {
+        document.querySelectorAll(".tooltip").forEach(t => t.style.display = "none");
+      });
+    });
+  });
+</script>
+</body>
+</html>
