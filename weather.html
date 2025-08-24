@@ -85,14 +85,14 @@ function getWeatherIcon(code, hour=null){
 
 // smallCard 内で使用
 function smallCard(day,index){
-  const icon = getWeatherIcon(day.code);
-  const code=wcode[day.code]||{t:'不明'};
+  const code = wcode[day.code] || { t:'不明', e:'❓' };
+  const umbrella = day.pop === 0 ? '☂️ ' : '☔️ '; // 0なら☂️、それ以上は☔️
   return `<div class="small-card" data-index="${index}">
     <div>${day.date}</div>
-    <div class="icon">${icon}</div>
+    <div class="icon">${code.e}</div>
     <div class="weather-text">${code.t}</div>
     <div class="temp">${Math.round(day.tmax)}°/${Math.round(day.tmin)}°</div>
-    <div>${day.pop}%</div>
+    <div>${umbrella}${day.pop}%</div>
   </div>`;
 }
 
