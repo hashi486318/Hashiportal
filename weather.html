@@ -6,71 +6,65 @@
   <title>何の変哲もない天気予報</title>
   <style>
     body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", Meiryo, sans-serif;
-      background: #fff;
-      color: #222;
+      margin:0; font-family:sans-serif;
+      background:#fff; color:#333;
+      display:flex; flex-direction:column; align-items:center;
+      padding:20px;
     }
-    h1 {
-      margin: 0;
-      padding: 16px;
-      font-size: 20px;
-      border-bottom: 1px solid #ddd;
-      text-align: center;
+    h1 { margin:0 0 10px; font-size:20px; }
+    .forecast-bar {
+      display:flex; gap:8px; margin-bottom:20px; overflow-x:auto;
     }
-    .wrap {
-      padding: 20px;
-      max-width: 800px;
-      margin: auto;
+    .small-card {
+      flex:0 0 auto; background:#f9f9f9;
+      border:1px solid #ddd; border-radius:10px;
+      padding:8px 12px; text-align:center; min-width:80px;
     }
-    .grid {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    .small-card .icon { font-size:20px; }
+    .small-card .temp { font-size:14px; }
+    .today-card {
+      background:#f9f9f9; border:1px solid #ddd; border-radius:12px;
+      padding:16px; text-align:center; width:260px;
     }
-    .card {
-      background: #fafafa;
-      border: 1px solid #e0e0e0;
-      border-radius: 10px;
-      padding: 12px;
-      text-align: center;
-    }
-    .date { font-weight: 600; margin-bottom: 6px; }
-    .icon { font-size: 28px; margin: 4px 0; }
-    .temp { font-size: 16px; margin: 4px 0; }
-    .precip { font-size: 14px; color: #0077cc; }
-    .error { color: #d00; margin-top: 20px; text-align: center; }
+    .today-card .icon { font-size:48px; }
+    .today-card .temp-now { font-size:28px; font-weight:bold; }
+    .today-card .temps { font-size:16px; margin:6px 0; }
+    .today-card .pop { font-size:14px; color:#666; }
+    .meta { margin-top:12px; font-size:12px; color:#666; }
+    .error { color:#f33; margin-top:12px; }
   </style>
 </head>
 <body>
-  <h1 id="title">天気予報</h1>
-  <div class="wrap">
-    <div id="grid" class="grid"></div>
-    <div id="err" class="error"></div>
-  </div>
+  <h1>週間天気（現在地）</h1>
+  <div id="bar" class="forecast-bar"></div>
+  <div id="today" class="today-card">読み込み中…</div>
+  <div id="meta" class="meta"></div>
+  <div id="err" class="error"></div>
 
 <script>
-const grid=document.getElementById('grid');
+const bar=document.getElementById('bar');
+const todayCard=document.getElementById('today');
+const meta=document.getElementById('meta');
 const err=document.getElementById('err');
-const title=document.getElementById('title');
 
 const wcode={
   0:{t:'快晴',e:'☀️'},1:{t:'晴れ',e:'🌤️'},2:{t:'薄曇り',e:'⛅'},3:{t:'曇り',e:'☁️'},
-  45:{t:'霧',e:'🌫️'},51:{t:'霧雨',e:'🌧️'},61:{t:'雨',e:'🌧️'},71:{t:'雪',e:'🌨️'},
-  80:{t:'にわか雨',e:'🌦️'},95:{t:'雷雨',e:'⛈️'}
+  45:{t:'霧',e:'🌫️'},51:{t:'小雨',e:'🌧️'},61:{t:'雨',e:'🌧️'},63:{t:'雨(中)',e:'🌧️'},65:{t:'大雨',e:'🌧️'},
+  71:{t:'雪',e:'🌨️'},75:{t:'大雪',e:'🌨️'},80:{t:'にわか雨',e:'🌦️'},95:{t:'雷雨',e:'⛈️'}
 };
 
-function fmtDate(d,tz){
-  return new Intl.DateTimeFormat('ja-JP',{weekday:'short',month:'numeric',day:'numeric',timeZone:tz}).format(new Date(d+'T00:00'));
+function fmtDate(d){
+  const date=new Date(d+'T00:00');
+  return new Intl.DateTimeFormat('ja-JP',{month:'numeric',day:'numeric',weekday:'short'}).format(date);
 }
 
-function cardHTML(day){
-  const code=wcode[day.weathercode]||{t:'',e:'❓'};
-  return `<div class="card">
-    <div class="date">${day.label}</div>
+function smallCard(day){
+  const code=wcode[day.code]||{e:'❓'};
+  return `<div class="small-card">
+    <div>${day.date}</div>
     <div class="icon">${code.e}</div>
-    <div class="temp">最高 ${Math.round(day.tmax)}° / 最低 ${Math.round(day.tmin)}°</div>
-    <div class="precip">降水確率 ${Math.round(day.pop)}%</div>
+    <div class="temp">${Math.round(day.tmax)}°/${Math.round(day.tmin)}°</div>
+    <div>${day.pop}%</div>
   </div>`;
 }
 
@@ -78,49 +72,44 @@ async function fetchForecast(lat,lon){
   const url=new URL('https://api.open-meteo.com/v1/forecast');
   url.search=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',
+    current:'temperature_2m,weathercode',
     daily:'weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
     forecast_days:7
-  }).toString();
+  });
   const res=await fetch(url);
   if(!res.ok) throw new Error('天気データ取得失敗');
   return res.json();
 }
 
-async function reverseGeocode(lat,lon){
-  const url=new URL('https://geocoding-api.open-meteo.com/v1/reverse');
-  url.search=new URLSearchParams({latitude:lat,longitude:lon,language:'ja'}).toString();
-  const res=await fetch(url);
-  if(!res.ok) return null;
-  const data=await res.json();
-  if(data && data.results && data.results[0]){
-    const r=data.results[0];
-    return r.name || r.admin1 || r.country;
-  }
-  return null;
-}
-
 async function init(){
   try{
     if(!('geolocation' in navigator)) throw new Error('位置情報が使えません');
-    const pos=await new Promise((ok,ng)=>navigator.geolocation.getCurrentPosition(ok,ng,{enableHighAccuracy:true}));
-    const lat=pos.coords.latitude,lon=pos.coords.longitude;
-
-    // 地名を取得
-    const placeName=await reverseGeocode(lat,lon);
-    if(placeName) title.textContent=`${placeName} の天気予報`;
-
-    // 天気データを取得
+    const pos=await new Promise((ok,ng)=>navigator.geolocation.getCurrentPosition(ok,ng));
+    const {latitude:lat,longitude:lon}=pos.coords;
     const data=await fetchForecast(lat,lon);
     const tz=data.timezone;
     const days=data.daily.time.map((d,i)=>({
-      date:d,label:fmtDate(d,tz),
-      weathercode:data.daily.weathercode[i],
+      date:fmtDate(d),
+      code:data.daily.weathercode[i],
       tmax:data.daily.temperature_2m_max[i],
       tmin:data.daily.temperature_2m_min[i],
       pop:data.daily.precipitation_probability_max[i]
     }));
-    grid.innerHTML=days.map(cardHTML).join('');
-  }catch(e){err.textContent=e.message;}
+    // 上に6日（今日を除いた分）
+    bar.innerHTML=days.slice(1).map(smallCard).join('');
+    // 今日カード
+    const today=days[0];
+    const nowTemp=Math.round(data.current.temperature_2m);
+    const code=wcode[today.code]||{t:'',e:'❓'};
+    todayCard.innerHTML=`
+      <div class="icon">${code.e}</div>
+      <div class="temp-now">${nowTemp}°C</div>
+      <div class="temps">最高 ${Math.round(today.tmax)}° / 最低 ${Math.round(today.tmin)}°</div>
+      <div class="pop">降水確率 ${today.pop}%</div>
+      <div>${code.t}</div>
+    `;
+    meta.textContent=`タイムゾーン: ${data.timezone_abbreviation}`;
+  }catch(e){ err.textContent=e.message; }
 }
 init();
 </script>
