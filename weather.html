@@ -18,7 +18,7 @@
   .small-card .icon { font-size:24px; }
   .small-card .temp { font-size:16px; margin-top:4px; }
   .small-card .weather-text { font-size:14px; margin-top:2px; }
-  .small-card  .selected { background:#ccc; border-color: #999; }
+  .small-card.selected { background:#999; border-color:#666; } /* 選択中濃い灰色 */
   .today-card { display:flex; background:#f9f9f9; border:1px solid #ddd; border-radius:12px;
                 padding:20px; width:100%; max-width:700px; margin-bottom:20px; }
   .today-left { flex:2; display:flex; flex-direction:column; align-items:center; justify-content:center; }
@@ -34,6 +34,7 @@
   .hour-card .pop { font-size:12px; color:#666; margin-top:2px; }
   .meta { margin-top:12px; font-size:14px; color:#666; }
   .error { color:#f33; margin-top:12px; }
+  #retry { margin-top:10px; padding:6px 12px; font-size:14px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -42,6 +43,7 @@
 <div class="today-card" id="today">読み込み中…</div>
 <div class="meta" id="meta"></div>
 <div class="error" id="err"></div>
+<button id="retry">再読み込み</button>
 
 <script>
 const header=document.getElementById('header');
@@ -49,6 +51,7 @@ const bar=document.getElementById('bar');
 const todayCard=document.getElementById('today');
 const meta=document.getElementById('meta');
 const err=document.getElementById('err');
+const retryBtn=document.getElementById('retry');
 
 const wcode = {
   0:{t:'晴れ', e:'☀️'},1:{t:'主に晴れ', e:'🌤️'},2:{t:'部分的に曇り', e:'⛅'},3:{t:'曇り', e:'☁️'},
@@ -149,19 +152,20 @@ let currentTemp=0;
 
 async function init(){
   try{
+    // 初期化
+    err.textContent='';
+    todayCard.textContent='読み込み中…';
+    bar.innerHTML='';
+
     if(!("geolocation" in navigator)) throw new Error("位置情報が使えません");
     const pos=await new Promise((ok,ng)=>navigator.geolocation.getCurrentPosition(ok,ng));
     const {latitude:lat,longitude:lon}=pos.coords;
 
-    // 逆ジオコーディングで都市名表示
+    // 逆ジオコーディング
     const locRes = await fetch(`https://geocode.maps.co/reverse?lat=${lat}&lon=${lon}`);
     const locData = await locRes.json();
-
-    // 県と市を取得
     const prefecture = locData.address.state || '';
     const city = locData.address.city || locData.address.town || locData.address.village || '';
-
-    // ヘッダーに表示
     header.textContent = `${prefecture}${city ? ' ' + city : ''}の天気予報`;
 
     const data=await fetchForecast(lat,lon);
@@ -180,20 +184,27 @@ async function init(){
     // 上に7日
     bar.innerHTML = forecastData.map((d,i)=>smallCard(d,i)).join('');
 
+    // 初期選択は0番
+    const cards=document.querySelectorAll('.small-card');
+    cards[0].classList.add('selected');
+
     // クリックで今日カード切替
-    document.querySelectorAll('.small-card').forEach(card=>{
+    cards.forEach(card=>{
       card.addEventListener('click',()=>{
-        document.querySelectorAll('.small-card').forEach(c=>c.classList.remove('selected'));
-        card.classList.add('selected'); // 選択中を強調
+        cards.forEach(c=>c.classList.remove('selected'));
+        card.classList.add('selected');
         renderTodayCard(Number(card.dataset.index));
       });
     });
 
     renderTodayCard(0);
-
     meta.textContent=`タイムゾーン: ${data.timezone_abbreviation}`;
   }catch(e){ err.textContent=e.message; }
 }
+
+// 再読み込みボタン
+retryBtn.addEventListener('click',()=>init());
+
 init();
 </script>
 </body>
