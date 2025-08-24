@@ -69,11 +69,27 @@ function fmtDate(d){
   return new Intl.DateTimeFormat('ja-JP',{month:'numeric',day:'numeric',weekday:'short'}).format(date);
 }
 
+// 昼夜判定してアイコンを返す関数
+function getWeatherIcon(code, hour=null){
+  // hour が指定されてなければ現在時刻
+  const nowHour = hour ?? new Date().getHours();
+  const isNight = nowHour < 6 || nowHour >= 18;
+
+  // 夜間に月にしたいコード（晴れ系）
+  const sunnyCodes = [0, 1, 2]; // 0:晴れ, 1:主に晴れ, 2:部分的に曇り
+  if(isNight && sunnyCodes.includes(code)) return '🌙';
+
+  // 通常は wcode 配列から取得
+  return wcode[code]?.e ?? '❓';
+}
+
+// smallCard 内で使用
 function smallCard(day,index){
-  const code=wcode[day.code]||{t:'不明',e:'❓'};
+  const icon = getWeatherIcon(day.code);
+  const code=wcode[day.code]||{t:'不明'};
   return `<div class="small-card" data-index="${index}">
     <div>${day.date}</div>
-    <div class="icon">${code.e}</div>
+    <div class="icon">${icon}</div>
     <div class="weather-text">${code.t}</div>
     <div class="temp">${Math.round(day.tmax)}°/${Math.round(day.tmin)}°</div>
     <div>${day.pop}%</div>
@@ -123,21 +139,29 @@ function getHourlyForDay(data,dayIndex){
 function renderTodayCard(dayIndex){
   const day=forecastData[dayIndex];
   const nowTemp=Math.round(currentTemp);
-  const code=wcode[day.code]||{t:"不明", e:"❓"};
+  const code=wcode[day.code]||{t:"不明"};
   const todayHours=getHourlyForDay(forecastDataRaw,dayIndex);
+
   const rightHTML = todayHours.map(h=> {
-    const hc=wcode[h.code]||{t:'?',e:'❓'};
+    const hourCode=wcode[h.code]||{t:'?'};
+    // 時間の時刻で昼夜判定
+    const hourInt = Number(h.time.split(":")[0]);
+    const hourIcon = getWeatherIcon(h.code, hourInt);
     const umbrella = h.pop>0 ? '☔' : '';
     return `<div class="hour-card">
       <div>${h.time}</div>
-      <div class="icon">${hc.e}</div>
+      <div class="icon">${hourIcon}</div>
       <div>${h.temp}°</div>
       <div class="pop">${umbrella} ${h.pop}%</div>
     </div>`;
   }).join('');
+
+  // 今日カード左側のアイコンも現在時刻で判定
+  const currentIcon = getWeatherIcon(day.code);
+
   todayCard.innerHTML=`
     <div class="today-left">
-      <div><span class="icon">${code.e}</span> <span class="weather-text">${code.t}</span></div>
+      <div><span class="icon">${currentIcon}</span> <span class="weather-text">${code.t}</span></div>
       <div class="temp-now">${nowTemp}°C</div>
       <div class="temps">最高 ${Math.round(day.tmax)}° / 最低 ${Math.round(day.tmin)}°</div>
       <div class="pop">降水確率 ${day.pop}%</div>
