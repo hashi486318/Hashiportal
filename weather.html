@@ -5,40 +5,58 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>何の変哲もない天気予報</title>
   <style>
-    body{margin:0;font-family:sans-serif;background:#0b1220;color:#fff}
-    h1{margin:0;padding:16px;font-size:20px}
-    .wrap{padding:0 16px 24px}
-    .meta{color:#ccc;font-size:13px;margin:4px 0 14px}
-    .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
-    .card{background:#141b2d;border-radius:12px;padding:12px}
-    .date{font-weight:600;font-size:14px}
-    .icon{font-size:32px}
-    .temps{display:flex;gap:8px;align-items:baseline}
-    .tmax{font-size:22px;font-weight:700}
-    .tmin{font-size:16px;color:#aaa}
-    .row{display:flex;justify-content:space-between;font-size:13px;color:#ccc}
-    .error{color:#f66;padding:12px}
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", Meiryo, sans-serif;
+      background: #fff;
+      color: #222;
+    }
+    h1 {
+      margin: 0;
+      padding: 16px;
+      font-size: 20px;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+    }
+    .wrap {
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+    .card {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+    .date { font-weight: 600; margin-bottom: 6px; }
+    .icon { font-size: 28px; margin: 4px 0; }
+    .temp { font-size: 16px; margin: 4px 0; }
+    .precip { font-size: 14px; color: #0077cc; }
+    .error { color: #d00; margin-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
-  <h1>週間天気（現在地）</h1>
+  <h1 id="title">天気予報</h1>
   <div class="wrap">
-    <div id="meta" class="meta">現在地を取得中…</div>
     <div id="grid" class="grid"></div>
     <div id="err" class="error"></div>
   </div>
 
 <script>
 const grid=document.getElementById('grid');
-const meta=document.getElementById('meta');
 const err=document.getElementById('err');
+const title=document.getElementById('title');
 
 const wcode={
   0:{t:'快晴',e:'☀️'},1:{t:'晴れ',e:'🌤️'},2:{t:'薄曇り',e:'⛅'},3:{t:'曇り',e:'☁️'},
-  45:{t:'霧',e:'🌫️'},48:{t:'着氷霧',e:'🌫️'},
-  51:{t:'霧雨(弱)',e:'🌧️'},53:{t:'霧雨(中)',e:'🌧️'},55:{t:'霧雨(強)',e:'🌧️'},
-  61:{t:'雨(弱)',e:'🌧️'},63:{t:'雨(中)',e:'🌧️'},65:{t:'雨(強)',e:'🌧️'},
-  71:{t:'雪(弱)',e:'🌨️'},73:{t:'雪(中)',e:'🌨️'},75:{t:'雪(強)',e:'🌨️'},
+  45:{t:'霧',e:'🌫️'},51:{t:'霧雨',e:'🌧️'},61:{t:'雨',e:'🌧️'},71:{t:'雪',e:'🌨️'},
   80:{t:'にわか雨',e:'🌦️'},95:{t:'雷雨',e:'⛈️'}
 };
 
@@ -49,12 +67,10 @@ function fmtDate(d,tz){
 function cardHTML(day){
   const code=wcode[day.weathercode]||{t:'',e:'❓'};
   return `<div class="card">
-    <div class="date">${day.label} ${code.e}</div>
-    <div class="temps"><div class="tmax">${Math.round(day.tmax)}°</div><div class="tmin">${Math.round(day.tmin)}°</div></div>
-    <div class="row"><span>天気</span><span>${code.t}</span></div>
-    <div class="row"><span>降水量</span><span>${Math.round(day.precip)} mm</span></div>
-    <div class="row"><span>風速max</span><span>${Math.round(day.wind)} m/s</span></div>
-    <div class="row"><span>日出/日没</span><span>${day.sunrise.slice(11,16)}/${day.sunset.slice(11,16)}</span></div>
+    <div class="date">${day.label}</div>
+    <div class="icon">${code.e}</div>
+    <div class="temp">最高 ${Math.round(day.tmax)}° / 最低 ${Math.round(day.tmin)}°</div>
+    <div class="precip">降水確率 ${Math.round(day.pop)}%</div>
   </div>`;
 }
 
@@ -62,7 +78,7 @@ async function fetchForecast(lat,lon){
   const url=new URL('https://api.open-meteo.com/v1/forecast');
   url.search=new URLSearchParams({
     latitude:lat,longitude:lon,timezone:'auto',
-    daily:'weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunrise,sunset',
+    daily:'weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
     forecast_days:7
   }).toString();
   const res=await fetch(url);
@@ -70,11 +86,30 @@ async function fetchForecast(lat,lon){
   return res.json();
 }
 
+async function reverseGeocode(lat,lon){
+  const url=new URL('https://geocoding-api.open-meteo.com/v1/reverse');
+  url.search=new URLSearchParams({latitude:lat,longitude:lon,language:'ja'}).toString();
+  const res=await fetch(url);
+  if(!res.ok) return null;
+  const data=await res.json();
+  if(data && data.results && data.results[0]){
+    const r=data.results[0];
+    return r.name || r.admin1 || r.country;
+  }
+  return null;
+}
+
 async function init(){
   try{
     if(!('geolocation' in navigator)) throw new Error('位置情報が使えません');
     const pos=await new Promise((ok,ng)=>navigator.geolocation.getCurrentPosition(ok,ng,{enableHighAccuracy:true}));
     const lat=pos.coords.latitude,lon=pos.coords.longitude;
+
+    // 地名を取得
+    const placeName=await reverseGeocode(lat,lon);
+    if(placeName) title.textContent=`${placeName} の天気予報`;
+
+    // 天気データを取得
     const data=await fetchForecast(lat,lon);
     const tz=data.timezone;
     const days=data.daily.time.map((d,i)=>({
@@ -82,13 +117,9 @@ async function init(){
       weathercode:data.daily.weathercode[i],
       tmax:data.daily.temperature_2m_max[i],
       tmin:data.daily.temperature_2m_min[i],
-      precip:data.daily.precipitation_sum[i],
-      wind:data.daily.wind_speed_10m_max[i],
-      sunrise:data.daily.sunrise[i],
-      sunset:data.daily.sunset[i],
+      pop:data.daily.precipitation_probability_max[i]
     }));
     grid.innerHTML=days.map(cardHTML).join('');
-    meta.textContent=`地点: 現在地 ｜ タイムゾーン: ${data.timezone_abbreviation}`;
   }catch(e){err.textContent=e.message;}
 }
 init();
