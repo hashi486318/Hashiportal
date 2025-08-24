@@ -10,37 +10,40 @@
     background:#fff; color:#333;
     display:flex; flex-direction:column; align-items:center; padding:20px;
   }
-  h1 { margin:0 0 10px; font-size:20px; }
-  .forecast-bar { display:flex; gap:8px; margin-bottom:20px; overflow-x:auto; width:100%; max-width:600px; }
+  h1 { margin:0 0 10px; font-size:24px; }
+  .forecast-bar { display:flex; gap:10px; margin-bottom:20px; overflow-x:auto; width:100%; max-width:700px; }
   .small-card { flex:0 0 auto; background:#f9f9f9; border:1px solid #ddd; border-radius:10px;
-                padding:8px 12px; text-align:center; min-width:100px; }
-  .small-card .icon { font-size:20px; }
-  .small-card .temp { font-size:14px; }
-  .small-card .weather-text { font-size:12px; margin-top:2px; }
+                padding:10px 14px; text-align:center; min-width:110px; cursor:pointer; transition:0.2s; }
+  .small-card:hover { background:#eee; }
+  .small-card .icon { font-size:24px; }
+  .small-card .temp { font-size:16px; margin-top:4px; }
+  .small-card .weather-text { font-size:14px; margin-top:2px; }
   .today-card { display:flex; background:#f9f9f9; border:1px solid #ddd; border-radius:12px;
-                padding:16px; width:100%; max-width:600px; margin-bottom:20px; }
+                padding:20px; width:100%; max-width:700px; margin-bottom:20px; }
   .today-left { flex:2; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-  .today-left .icon { font-size:48px; display:inline-block; vertical-align:middle; }
-  .today-left .weather-text { font-size:18px; display:inline-block; margin-left:8px; vertical-align:middle; }
-  .today-left .temp-now { font-size:28px; font-weight:bold; margin-top:8px; }
-  .today-left .temps { font-size:16px; margin:6px 0; }
-  .today-left .pop { font-size:14px; color:#666; }
+  .today-left .icon { font-size:64px; display:inline-block; vertical-align:middle; }
+  .today-left .weather-text { font-size:22px; display:inline-block; margin-left:8px; vertical-align:middle; }
+  .today-left .temp-now { font-size:36px; font-weight:bold; margin-top:10px; }
+  .today-left .temps { font-size:20px; margin:8px 0; }
+  .today-left .pop { font-size:16px; color:#666; }
   .today-right { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; 
-                 gap:8px; padding-left:12px; max-height:250px; overflow-y:auto; }
-  .hour-card { display:flex; flex-direction:column; align-items:center; font-size:12px; min-width:50px; }
-  .hour-card .icon { font-size:18px; }
-  .meta { margin-top:12px; font-size:12px; color:#666; }
+                 gap:10px; padding-left:16px; max-height:350px; overflow-y:auto; }
+  .hour-card { display:flex; flex-direction:column; align-items:center; font-size:14px; min-width:60px; }
+  .hour-card .icon { font-size:22px; }
+  .hour-card .pop { font-size:12px; color:#666; margin-top:2px; }
+  .meta { margin-top:12px; font-size:14px; color:#666; }
   .error { color:#f33; margin-top:12px; }
 </style>
 </head>
 <body>
-<h1>何の変哲もない天気予報</h1>
+<h1 id="header">読み込み中…</h1>
 <div class="forecast-bar" id="bar"></div>
 <div class="today-card" id="today">読み込み中…</div>
 <div class="meta" id="meta"></div>
 <div class="error" id="err"></div>
 
 <script>
+const header=document.getElementById('header');
 const bar=document.getElementById('bar');
 const todayCard=document.getElementById('today');
 const meta=document.getElementById('meta');
@@ -62,11 +65,12 @@ function fmtDate(d){
   return new Intl.DateTimeFormat('ja-JP',{month:'numeric',day:'numeric',weekday:'short'}).format(date);
 }
 
-function smallCard(day){
+function smallCard(day,index){
   const code=wcode[day.code]||{t:'不明',e:'❓'};
-  return `<div class="small-card">
+  return `<div class="small-card" data-index="${index}">
     <div>${day.date}</div>
-    <div class="icon">${code.e} <span class="weather-text">${code.t}</span></div>
+    <div class="icon">${code.e}</div>
+    <div class="weather-text">${code.t}</div>
     <div class="temp">${Math.round(day.tmax)}°/${Math.round(day.tmin)}°</div>
     <div>${day.pop}%</div>
   </div>`;
@@ -96,60 +100,86 @@ function getDailyPOP(dates,hourlyTimes,hourlyPOPs){
   return dates.map(d=>pops[d]??0);
 }
 
-function getTodayHourly(data){
-  const todayStr = data.daily.time[0];
+function getHourlyForDay(data,dayIndex){
+  const dayStr = data.daily.time[dayIndex];
   const arr=[];
   data.hourly.time.forEach((t,i)=>{
-    if(t.startsWith(todayStr)){
+    if(t.startsWith(dayStr)){
       arr.push({
         time:t.split("T")[1].slice(0,5),
         temp: Math.round(data.hourly.temperature_2m[i]),
-        code: data.hourly.weathercode[i]
+        code: data.hourly.weathercode[i],
+        pop: data.hourly.precipitation_probability[i]
       });
     }
   });
   return arr;
 }
 
+function renderTodayCard(dayIndex){
+  const day=forecastData[dayIndex];
+  const nowTemp=Math.round(currentTemp);
+  const code=wcode[day.code]||{t:"不明", e:"❓"};
+  const todayHours=getHourlyForDay(forecastDataRaw,dayIndex);
+  const rightHTML = todayHours.map(h=> {
+    const hc=wcode[h.code]||{t:'?',e:'❓'};
+    const umbrella = h.pop>0 ? '☔' : '';
+    return `<div class="hour-card">
+      <div>${h.time}</div>
+      <div class="icon">${hc.e}</div>
+      <div>${h.temp}°</div>
+      <div class="pop">${umbrella} ${h.pop}%</div>
+    </div>`;
+  }).join('');
+  todayCard.innerHTML=`
+    <div class="today-left">
+      <div><span class="icon">${code.e}</span> <span class="weather-text">${code.t}</span></div>
+      <div class="temp-now">${nowTemp}°C</div>
+      <div class="temps">最高 ${Math.round(day.tmax)}° / 最低 ${Math.round(day.tmin)}°</div>
+      <div class="pop">降水確率 ${day.pop}%</div>
+    </div>
+    <div class="today-right">${rightHTML}</div>
+  `;
+}
+
+let forecastDataRaw=null;
+let forecastData=[];
+let currentTemp=0;
+
 async function init(){
   try{
     if(!("geolocation" in navigator)) throw new Error("位置情報が使えません");
     const pos=await new Promise((ok,ng)=>navigator.geolocation.getCurrentPosition(ok,ng));
     const {latitude:lat,longitude:lon}=pos.coords;
+
+    // 逆ジオコーディングで都市名表示
+    const locRes = await fetch(`https://geocode.maps.co/reverse?lat=${lat}&lon=${lon}`);
+    const locData = await locRes.json();
+    header.textContent = locData.address.city || locData.address.town || locData.address.village || "現在地";
+
     const data=await fetchForecast(lat,lon);
+    forecastDataRaw = data;
     const days=data.daily.time;
     const pops=getDailyPOP(days,data.hourly.time,data.hourly.precipitation_probability);
-    const arr=days.map((d,i)=>({
+    forecastData = days.map((d,i)=>({
       date:fmtDate(d),
       code:data.daily.weathercode[i],
       tmax:data.daily.temperature_2m_max[i],
       tmin:data.daily.temperature_2m_min[i],
       pop:pops[i]
     }));
-    // 上に6日
-    bar.innerHTML=arr.slice(1).map(smallCard).join('');
-    // 今日カード
-    const today=arr[0];
-    const nowTemp=Math.round(data.current.temperature_2m);
-    const code=wcode[today.code]||{t:"不明", e:"❓"};
-    const todayHours=getTodayHourly(data);
-    const rightHTML = todayHours.map(h=> {
-      const hc=wcode[h.code]||{t:'?',e:'❓'};
-      return `<div class="hour-card">
-        <div>${h.time}</div>
-        <div class="icon">${hc.e}</div>
-        <div>${h.temp}°</div>
-      </div>`;
-    }).join('');
-    todayCard.innerHTML=`
-      <div class="today-left">
-        <div><span class="icon">${code.e}</span> <span class="weather-text">${code.t}</span></div>
-        <div class="temp-now">${nowTemp}°C</div>
-        <div class="temps">最高 ${Math.round(today.tmax)}° / 最低 ${Math.round(today.tmin)}°</div>
-        <div class="pop">降水確率 ${today.pop}%</div>
-      </div>
-      <div class="today-right">${rightHTML}</div>
-    `;
+    currentTemp = data.current.temperature_2m;
+
+    // 上に7日
+    bar.innerHTML = forecastData.map((d,i)=>smallCard(d,i)).join('');
+
+    // クリックで今日カード切替
+    document.querySelectorAll('.small-card').forEach(card=>{
+      card.addEventListener('click',()=>renderTodayCard(Number(card.dataset.index)));
+    });
+
+    renderTodayCard(0);
+
     meta.textContent=`タイムゾーン: ${data.timezone_abbreviation}`;
   }catch(e){ err.textContent=e.message; }
 }
