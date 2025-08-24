@@ -38,12 +38,12 @@
 </style>
 </head>
 <body>
-<h1 id="header">読み込み中…</h1>
+<h1 id="header">Loading…</h1>
 <div class="forecast-bar" id="bar"></div>
-<div class="today-card" id="today">読み込み中…</div>
+<div class="today-card" id="today">Loading…</div>
 <div class="meta" id="meta"></div>
 <div class="error" id="err"></div>
-<button id="retry">再読み込み</button>
+<button id="retry">Reload</button>
 
 <script>
 const header=document.getElementById('header');
@@ -178,7 +178,7 @@ async function init(){
   try{
     // 初期化
     err.textContent='';
-    todayCard.textContent='読み込み中…';
+    todayCard.textContent='Loading…';
     bar.innerHTML='';
 
     if(!("geolocation" in navigator)) throw new Error("位置情報が使えません");
