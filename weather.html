@@ -147,7 +147,7 @@ function renderTodayCard(dayIndex){
     // 時間の時刻で昼夜判定
     const hourInt = Number(h.time.split(":")[0]);
     const hourIcon = getWeatherIcon(h.code, hourInt);
-    const umbrella = h.pop>0 ? '☔' : '';
+    const umbrella = h.pop === 0 ? '☂️ ' : '☔️ ';
     return `<div class="hour-card">
       <div>${h.time}</div>
       <div class="icon">${hourIcon}</div>
