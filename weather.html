@@ -162,7 +162,7 @@ function renderTodayCard(dayIndex){
   todayCard.innerHTML=`
     <div class="today-left">
       <div><span class="icon">${currentIcon}</span> <span class="weather-text">${code.t}</span></div>
-      <div class="temp-now">${nowTemp}°C</div>
+      <div class="temp-now">現在の気温　${nowTemp}°C</div>
       <div class="temps">最高 ${Math.round(day.tmax)}° / 最低 ${Math.round(day.tmin)}°</div>
       <div class="pop">降水確率 ${day.pop}%</div>
     </div>
